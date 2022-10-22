@@ -49,8 +49,13 @@
 #include "onvm_nf.h"
 #include "onvm_mgr.h"
 #include "onvm_stats.h"
+#include "onvm_common.h"
 #include <rte_lpm.h>
+#include <rte_malloc.h>
+#include <rte_rwlock.h>
 
+
+extern struct onvm_work_queue *work_queue;
 /* ID 0 is reserved */
 uint16_t next_instance_id = 1;
 uint16_t starting_instance_id = 1;
@@ -138,6 +143,8 @@ onvm_nf_clear_rings(struct onvm_nf *nf);
 static void
 onvm_nf_init_rings(struct onvm_nf *nf);
 
+int add_work_node(struct onvm_work_queue* work_queue,uint16_t nf_id);
+
 /********************************Interfaces***********************************/
 
 uint16_t
@@ -172,6 +179,29 @@ onvm_nf_next_instance_id(void) {
         /* This should never happen, means our num_nfs counter is wrong */
         RTE_LOG(ERR, APP, "Tried to allocated a next instance ID but num_nfs is corrupted\n");
         return MAX_NFS;
+}
+
+int add_work_node(struct onvm_work_queue* work_queue,uint16_t nf_id){
+        rte_rwlock_write_lock(&work_queue->lock);
+        struct work_node* new_node = NULL;
+        int ret = rte_mempool_get(work_queue->node_pool, (void **) (&new_node));
+        if(!ret)
+                return -1;
+        new_node->nf_id = nf_id;
+        new_node->next = NULL;
+        new_node->prev = NULL;
+
+        if(work_queue->head == NULL){
+                work_queue->head = new_node;
+                work_queue->tail = new_node;
+        }else{
+                work_queue->tail->next = new_node;
+                new_node->prev = work_queue->tail;
+                work_queue->tail = new_node;
+        }
+        work_queue->size ++;
+        rte_rwlock_write_unlock(&work_queue->lock);
+        return 0;
 }
 
 void
@@ -210,6 +240,8 @@ onvm_nf_check_status(void) {
                                 if (onvm_nf_start(nf_init_cfg) == 0) {
                                         onvm_stats_gen_event_nf_info("NF Starting", &nfs[nf_init_cfg->instance_id]);
                                 }
+                                //add id to queue
+                                add_work_node(work_queue,nf_init_cfg->instance_id);
                                 break;
                         case MSG_NF_READY:
                                 nf = (struct onvm_nf *)msg->msg_data;

@@ -107,6 +107,9 @@ struct onvm_service_chain *default_chain;
 /* Shared data for onvm config */
 struct onvm_configuration *onvm_config;
 
+/* Shared work queue */
+struct onvm_work_queue *work_queue;
+
 /* Flag to check if shared core mutex sleep/wakeup is enabled */
 uint8_t ONVM_NF_SHARE_CORES;
 
@@ -894,6 +897,7 @@ onvm_nflib_lookup_shared_structs(void) {
         const struct rte_memzone *mz_services;
         const struct rte_memzone *mz_nf_per_service;
         const struct rte_memzone *mz_onvm_config;
+        const struct rte_memzone *mz_work_queue;
         struct rte_mempool *mp;
         struct onvm_service_chain **scp;
 
@@ -916,6 +920,11 @@ onvm_nflib_lookup_shared_structs(void) {
         if (mz_nf == NULL)
                 rte_exit(EXIT_FAILURE, "Cannot get NF structure mempool\n");
         nfs = mz_nf->addr;
+
+        mz_work_queue = rte_memzone_lookup(MZ_WORK_QUEUE);
+        if (mz_work_queue == NULL)
+                rte_exit(EXIT_FAILURE, "Cannot get work queue mempool\n");
+        work_queue = mz_work_queue->addr;
 
         mz_services = rte_memzone_lookup(MZ_SERVICES_INFO);
         if (mz_services == NULL) {

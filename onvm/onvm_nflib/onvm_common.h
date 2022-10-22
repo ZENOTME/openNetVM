@@ -55,6 +55,8 @@
 #include <rte_mbuf.h>
 #include <rte_hash.h>
 #include <rte_ethdev.h>
+#include <rte_rwlock.h>
+
 
 #include "onvm_config_common.h"
 #include "onvm_msg_common.h"
@@ -372,6 +374,20 @@ struct ft_request {
         int status;
 };
 
+struct work_node {
+        uint16_t nf_id;
+        struct work_node *next;
+        struct work_node *prev;
+};
+
+struct onvm_work_queue {
+        rte_rwlock_t lock;
+        struct rte_mempool *node_pool;
+        uint16_t size;
+        struct work_node *head;
+        struct work_node *tail;
+};
+
 /* define common names for structures shared between server and NF */
 #define MP_NF_RXQ_NAME "MProc_Client_%u_RX"
 #define MP_NF_TXQ_NAME "MProc_Client_%u_TX"
@@ -380,6 +396,7 @@ struct ft_request {
 #define MZ_PORT_INFO "MProc_port_info"
 #define MZ_CORES_STATUS "MProc_cores_info"
 #define MZ_NF_INFO "MProc_nf_init_cfg"
+#define MZ_WORK_QUEUE "MProc_work_queue"
 #define MZ_SERVICES_INFO "MProc_services_info"
 #define MZ_NF_PER_SERVICE_INFO "MProc_nf_per_service_info"
 #define MZ_ONVM_CONFIG "MProc_onvm_config"
@@ -390,6 +407,7 @@ struct ft_request {
 #define _NF_MSG_QUEUE_NAME "NF_%u_MSG_QUEUE"
 #define _NF_MEMPOOL_NAME "NF_INFO_MEMPOOL"
 #define _NF_MSG_POOL_NAME "NF_MSG_MEMPOOL"
+
 
 /* interrupt semaphore specific updates */
 #define SHMSZ 4                         // size of shared memory segement (page_size)

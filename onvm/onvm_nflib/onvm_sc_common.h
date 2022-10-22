@@ -45,7 +45,7 @@
 #include "onvm_common.h"
 
 /********************************Global variables*****************************/
-
+extern struct onvm_work_queue *work_queue;
 extern struct onvm_nf *nfs;
 extern uint16_t **services;
 extern uint16_t *nf_per_service_count;

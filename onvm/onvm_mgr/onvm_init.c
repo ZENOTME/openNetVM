@@ -48,10 +48,11 @@
 ******************************************************************************/
 
 #include "onvm_mgr/onvm_init.h"
-
+#include <rte_rwlock.h>
 /********************************Global variables*****************************/
 
 struct onvm_nf *nfs = NULL;
+struct onvm_work_queue *work_queue = NULL;
 struct port_info *ports = NULL;
 struct core_status *cores = NULL;
 struct onvm_configuration *onvm_config = NULL;
@@ -88,6 +89,9 @@ init_shared_sem(void);
 
 static int
 init_info_queue(void);
+
+static int
+init_work_queue(void);
 
 static void
 check_all_ports_link_status(uint8_t port_num, uint32_t port_mask);
@@ -244,6 +248,8 @@ init(int argc, char *argv[]) {
         /* initialise the shared memory for shared core mode */
         init_shared_sem();
 
+        /* initialise work queue */
+        init_work_queue();
         /*initialize a default service chain*/
         default_chain = onvm_sc_create();
         retval = onvm_sc_append_entry(default_chain, ONVM_NF_ACTION_TONF, 1);
@@ -275,6 +281,22 @@ init(int argc, char *argv[]) {
 static void
 set_default_config(struct onvm_configuration *config) {
         config->flags.ONVM_NF_SHARE_CORES = ONVM_NF_SHARE_CORES_DEFAULT;
+}
+
+static int
+init_work_queue(void) {
+        const struct rte_memzone *mz_work_queue = rte_memzone_reserve(MZ_WORK_QUEUE, sizeof(struct onvm_work_queue), rte_socket_id(), NO_FLAGS);
+        if (mz_work_queue == NULL)
+                rte_exit(EXIT_FAILURE, "Cannot reserve memory zone for work queue\n");
+        memset(mz_work_queue->addr, 0, sizeof(struct onvm_work_queue));
+        work_queue = mz_work_queue->addr;
+
+        rte_rwlock_init(&work_queue->lock);
+
+        work_queue->node_pool = rte_mempool_create("node_pool", MAX_NFS, sizeof(struct work_node), 32, 0, NULL, NULL, NULL, NULL, rte_socket_id(), NO_FLAGS);
+        if (work_queue->node_pool == NULL)
+                rte_exit(EXIT_FAILURE, "Cannot create node pool in work queue\n");
+        return 0;
 }
 
 /**

@@ -47,7 +47,7 @@
 ******************************************************************************/
 
 #include "onvm_pkt_common.h"
-
+#include <rte_rwlock.h>
 /**********************Internal Functions Prototypes**************************/
 
 /*
@@ -131,13 +131,14 @@ onvm_pkt_process_tx_batch(struct queue_mgr *tx_mgr, struct rte_mbuf *pkts[], uin
 
 void
 onvm_pkt_flush_all_nfs(struct queue_mgr *tx_mgr, struct onvm_nf *source_nf) {
-        uint16_t i;
-
+        struct work_node* node = NULL;
         if (tx_mgr == NULL)
                 return;
 
-        for (i = 0; i < MAX_NFS; i++)
-                onvm_pkt_flush_nf_queue(tx_mgr, i, source_nf);
+        rte_rwlock_read_lock(&work_queue->lock);
+        for (node = work_queue->head; node != NULL ; node=node->next)
+                onvm_pkt_flush_nf_queue(tx_mgr, node->nf_id, source_nf);
+        rte_rwlock_read_unlock(&work_queue->lock);
 }
 
 void
